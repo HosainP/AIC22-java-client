@@ -1,15 +1,13 @@
 package ir.sharif.aic.hideandseek.ai;
 
-import ir.sharif.aic.hideandseek.algorithms.BFS;
+import ir.sharif.aic.hideandseek.algorithms.CentralNode;
 import ir.sharif.aic.hideandseek.algorithms.Dijkstra;
+import ir.sharif.aic.hideandseek.algorithms.RandomMove;
 import ir.sharif.aic.hideandseek.client.Phone;
 import ir.sharif.aic.hideandseek.protobuf.AIProto;
 import ir.sharif.aic.hideandseek.protobuf.AIProto.GameView;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.Stack;
+import java.util.*;
 
 public class PoliceAI extends AI {
 
@@ -17,13 +15,18 @@ public class PoliceAI extends AI {
     List<Integer> thieves_last_seen; // this is the array list of last places that thieves were seen.
     Stack<Integer> bfs_path; // this is the path we are going to take.
     ArrayList<AIProto.Agent> tracked_thieves; // i save details of enemy thieves her.
-    int path_index;
+    List<MyPolice> my_polices;
+    ArrayList<MyNode> all_nodes;
+    ArrayList<Integer> taken_nodes; // this saves the nodes that we have been through.
+                                    // works for random moving, so we don't go to a repeated
+                                    // node again.
 
     public PoliceAI(Phone phone) {
         this.phone = phone;
         selected_thief = null;
         thieves_last_seen = null;
         bfs_path = null;
+        taken_nodes = new ArrayList<>();
     }
 
     /**
@@ -31,89 +34,38 @@ public class PoliceAI extends AI {
      */
     @Override
     public int getStartingNode(GameView gameView) {
+        List<AIProto.Agent> agents = gameView.getVisibleAgentsList();
+        my_polices = new ArrayList<>();
+        for (AIProto.Agent agent : agents) { // i have a list of all my polices in here. which are numbered as i want.
+            if (agent.getTeam() == gameView.getViewer().getTeam() && agent.getType() == AIProto.AgentType.POLICE) {
+                my_polices.add(new MyPolice(agent));
+            }
+        }
+        my_polices.add(new MyPolice(gameView.getViewer())); // add this police to list of polices.
+
+        my_polices.sort(Comparator.comparingInt(o -> o.police.getId()));
+        for (int i = 1; i < my_polices.size() + 1; i++) {
+            my_polices.get(i - 1).id = i;
+        }
+
+        all_nodes = new ArrayList<>();
+        for (AIProto.Node node : gameView.getConfig().getGraph().getNodesList()) {
+            all_nodes.add(new MyNode(gameView.getConfig().getGraph(), node));
+        }
+        all_nodes.sort(Comparator.comparingInt(o -> o.number_of_neighbors));
+        // the one with the most neighbors is at the end of all_nodes ArrayList.
+//        System.out.print("selected nodes = ");
+//        for (MyNode myNode : all_nodes) {
+//            System.out.print(myNode.node.getId() + ", ");
+//        }
+//        System.out.println();
+
         return 1;
     }
 
     /**
      * Implement this function to move your police agent based on current game view.
      */
-
-//    @Override
-//    public int move(GameView gameView) {
-//
-//        System.out.println("MOVE METHOD IN POLICE CALLED.");
-//
-//        AIProto.GameConfig config = gameView.getConfig();
-//        List<Integer> visible_turns =  config.getTurnSettings().getVisibleTurnsList();
-//
-//        AIProto.Team myTeam = AIProto.Team.FIRST; // "FIRST" is temporary.
-//        if (!visible_turns.contains(gameView.getTurn().getTurnNumber())) {
-//            for (AIProto.Agent agent : gameView.getVisibleAgentsList()) {
-//                if (agent.getType() == AIProto.AgentType.THIEF) {
-//                    myTeam = agent.getTeam();    // here i find out which team i am in.
-//                    break;
-//                }
-//            }
-//        }
-//
-//        if (visible_turns.contains(gameView.getTurn().getTurnNumber())) {
-//            thieves_last_seen = new ArrayList<>();
-//            for (AIProto.Agent agent : gameView.getVisibleAgentsList()) {
-//                if (!agent.getIsDead() && agent.getTeam() != myTeam && agent.getType() == AIProto.AgentType.THIEF) {
-//                    thieves_last_seen.add(agent.getNodeId()); // now i have an array list of nodes of all enemy thieves.
-//                }
-//            }
-//        }
-//
-//        AIProto.Graph graph = gameView.getConfig().getGraph();
-//
-//        int next_node = 1;
-//        if (thieves_last_seen != null) { // we have seen thieves at least once.
-//            System.out.println("i want to use dijkstra.");
-//            if (selected_thief == null) { // if we are not chasing any thief, we choose another one.
-//                int rand = new Random().nextInt(thieves_last_seen.size());
-//                selected_thief = thieves_last_seen.get(rand);
-//            }
-//            System.out.println("i have selected a thief to follow.");
-//            next_node = new Dijkstra().nextStep(graph, gameView.getViewer().getNodeId(), selected_thief);
-//
-//            System.out.println();
-//            System.out.println("i used dijkstra");
-//            System.out.println();
-//        } else { // we have not seen thieves never yet.
-//            next_node = gameView.getViewer().getNodeId(); // we stay in our place . // todo
-//            System.out.println();
-//            System.out.println("we didn't use dijkstra");
-//            System.out.println();
-//        }
-//
-//        return next_node;
-//    } // DIJKSTRA
-
-
-//    @Override
-//    public int move(GameView gameView){
-//
-//        AIProto.Graph graph = gameView.getConfig().getGraph();
-//        List<AIProto.Path> paths = graph.getPathsList();
-//        ArrayList<AIProto.Path> myPaths = new ArrayList<>();
-//
-//        for (AIProto.Path path : paths) {
-//            if (path.getFirstNodeId() == gameView.getViewer().getNodeId()) {
-//                myPaths.add(path);
-//            } else if (path.getSecondNodeId() == gameView.getViewer().getNodeId()) {
-//                myPaths.add(path);
-//            }
-//        }
-//
-//        int rand = new Random().nextInt(myPaths.size());
-//        AIProto.Path path = myPaths.get(rand);
-//        if (gameView.getViewer().getNodeId() == path.getFirstNodeId())
-//            return path.getSecondNodeId();
-//        else
-//            return path.getFirstNodeId();
-//    } // MOVING COMPLETELY RANDOM.
-
 
 //    @Override
 //    public int move(GameView gameView) {
@@ -133,14 +85,10 @@ public class PoliceAI extends AI {
 //        else
 //            return gameView.getViewer().getNodeId();
 //    } // BFS PATH (COMPLETELY BULLSHIT)
+
+
     @Override
     public int move(GameView gameView) {
-
-//        AIProto.Graph graph = gameView.getConfig().getGraph();
-//        ArrayList<Integer> path = Dijkstra.findPath(graph, gameView.getViewer().getNodeId(), 150);
-//        System.out.println(path);
-//        return path.get(path.size() - 1);
-
 
         AIProto.GameConfig config = gameView.getConfig();
         List<Integer> visible_turns = config.getTurnSettings().getVisibleTurnsList();
@@ -158,14 +106,15 @@ public class PoliceAI extends AI {
 
         AIProto.Graph graph = gameView.getConfig().getGraph();
 
-        ArrayList<Integer> path = new ArrayList<>();
+        ArrayList<Integer> path;
         int next_node;
+
         if (tracked_thieves != null) { // we have seen thieves at least once.
-            System.out.println("i want to use dijkstra.");
             while (selected_thief == null || selected_thief.getIsDead() || selected_thief.getNodeId() == gameView.getViewer().getNodeId()) { // if we are not chasing any thief, we choose another one.
-                int rand = new Random().nextInt(tracked_thieves.size()); // todo "while performance is not good."
+                int rand = new Random().nextInt(tracked_thieves.size());
                 selected_thief = tracked_thieves.get(rand);
-                System.out.println("i have selected a new thief to follow.");
+                // todo: if i go to a thief location and it is not there, i choose another thief to follow, even if the thief is still alive.
+                // todo: selecting a thief is random, which should not be.
             }
 
             path = Dijkstra.findPath(graph, gameView.getViewer().getNodeId(), selected_thief.getNodeId());
@@ -174,13 +123,14 @@ public class PoliceAI extends AI {
             } else {
                 next_node = gameView.getViewer().getNodeId();
             }
-            System.out.println("i used dijkstra");
         } else { // we have not seen thieves never yet.
-            next_node = gameView.getViewer().getNodeId(); // we stay in our place . // todo
-            System.out.println("i didn't use dijkstra");
+//            next_node = CentralNode.findPath(my_polices, all_nodes, gameView); // this method finds some central nodes, and gives each police one of them.
+            next_node = RandomMove.getRandomNextNode(gameView.getConfig().getGraph(), gameView.getViewer(), taken_nodes, false); // the "false" is to go to a new node every turn.
+            taken_nodes.add(gameView.getViewer().getNodeId());
         }
-
         return next_node;
     }
 }
+
+
 
