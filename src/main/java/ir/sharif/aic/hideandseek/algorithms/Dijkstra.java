@@ -1,13 +1,12 @@
 package ir.sharif.aic.hideandseek.algorithms;
 
-import io.netty.resolver.InetNameResolver;
 import ir.sharif.aic.hideandseek.protobuf.AIProto;
 
 import java.util.*;
 
 public class Dijkstra {
 
-    public static ArrayList<Integer> findPath(AIProto.Graph graph, int src, int dest) {
+    public static ArrayList<Integer> findPath(AIProto.Graph graph, int src, int dest, Mode mode) {
         Node[] nodes = new Node[graph.getNodesCount() + 1];
         ArrayList<Node> finished_nodes = new ArrayList<>();
         ArrayList<Node> unfinished_nodes = new ArrayList<>();
@@ -21,8 +20,8 @@ public class Dijkstra {
             int first = path.getFirstNodeId();
             int second = path.getSecondNodeId();
 
-            nodes[first].neighbors.add(new Neighbor(nodes[second], path.getPrice())); // todo path.getPrice();
-            nodes[second].neighbors.add(new Neighbor(nodes[first], path.getPrice()));
+            nodes[first].neighbors.add(new Neighbor(nodes[second], mode == Mode.CHEAP ? path.getPrice() : 1)); // todo path.getPrice();
+            nodes[second].neighbors.add(new Neighbor(nodes[first], mode == Mode.CHEAP ? path.getPrice() : 1));
         } // the graph is complete.
 
         while (!finished_nodes.contains(nodes[dest])) {
@@ -86,3 +85,4 @@ class Neighbor {
         this.weight = weight;
     }
 }
+

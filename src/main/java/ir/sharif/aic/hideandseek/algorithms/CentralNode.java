@@ -24,7 +24,7 @@ public class CentralNode {
         for (int i = 0; i < my_polices.size(); i++) { // for every police id
             if (gameView.getViewer().getId() == my_polices.get(i).police.getId()) {
                 int destination = all_nodes.get(all_nodes.size() - my_polices.get(i).id).node.getId();
-                path = Dijkstra.findPath(gameView.getConfig().getGraph(), gameView.getViewer().getNodeId(), destination);
+                path = Dijkstra.findPath(gameView.getConfig().getGraph(), gameView.getViewer().getNodeId(), destination, Mode.CHEAP);
                 next_node = path.get(path.size() - 1);
 //                System.out.println("i am " + gameView.getViewer().getId() + "and i am going to " + next_node + "my destination is " + destination);
                 break;
