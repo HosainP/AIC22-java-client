@@ -75,9 +75,10 @@ public class PoliceAI extends AI {
             next_node = go(gameView, selected_thief.getNodeId());
 
         } else { // we have not seen thieves never yet.
-//            next_node = CentralNode.findPath(my_polices, all_nodes, gameView); // this method finds some central nodes, and gives each police one of them.
-//            next_node = RandomMove.getRandomNextNode(gameView.getConfig().getGraph(), gameView.getViewer(), taken_nodes, false); // the "false" is to go to a new node every turn.
-//            taken_nodes.add(gameView.getViewer().getNodeId());
+
+            // in this case, we see where all polices can get until the first visible turn,
+            // and each of them will go to one of them, with the most neighbors.
+
             for (MyPolice myPolice : my_polices) {
                 if (myPolice.police.getId() == gameView.getViewer().getId()) {
                     next_node = go(gameView, myPolice.first_destination);
@@ -101,29 +102,6 @@ public class PoliceAI extends AI {
             }
             System.out.println("thieves updated.");
         }
-    }
-
-    /////////////////////////////////////////////// FUNCTIONS ///////////////////////////////////////////////
-
-    ArrayList<Integer> find_nodes_with_distance(AIProto.Graph graph, int source, int distance) {
-        ArrayList<Integer> checked_nodes = new ArrayList<>();
-        ArrayList<Integer> this_level_nodes = new ArrayList<>();
-        ArrayList<Integer> next_level_nodes = new ArrayList<>();
-        this_level_nodes.add(source); // the only use of 'source'. if the source is always 1, then it can simply be 1.
-
-        for (int i = 0; i < distance; i++) {
-            for (AIProto.Path path : graph.getPathsList()) {
-                if (this_level_nodes.contains(path.getSecondNodeId()) && !checked_nodes.contains(path.getFirstNodeId())) {
-                    next_level_nodes.add(path.getFirstNodeId());
-                } else if (this_level_nodes.contains(path.getFirstNodeId()) && !checked_nodes.contains(path.getSecondNodeId())) {
-                    next_level_nodes.add(path.getSecondNodeId());
-                }
-            }
-            checked_nodes.addAll(this_level_nodes);
-            this_level_nodes = next_level_nodes;
-            next_level_nodes = new ArrayList<>();
-        }
-        return this_level_nodes; // return nodes with the distance of "distance" (price not calculated)
     }
 
     /////////////////////////////////////////////// FUNCTIONS ///////////////////////////////////////////////
@@ -201,7 +179,7 @@ public class PoliceAI extends AI {
             visible_ptr++;
             first_visible_turn = gameView.getConfig().getTurnSettings().getVisibleTurnsList().get(visible_ptr);
         }
-        ArrayList<Integer> distance_n_nodes_number = find_nodes_with_distance(gameView.getConfig().getGraph(), 1, (first_visible_turn - 2) / 2);
+        ArrayList<Integer> distance_n_nodes_number = Functions.find_nodes_with_distance(gameView.getConfig().getGraph(), 1, (first_visible_turn - 2) / 2);
         ArrayList<AIProto.Node> distance_n_nodes = new ArrayList<>();
         for (AIProto.Node node : gameView.getConfig().getGraph().getNodesList()) {
             if (distance_n_nodes_number.contains(node.getId())) {
