@@ -52,27 +52,33 @@ public class PoliceAI extends AI {
     @Override
     public int move(GameView gameView) {
 
-        updateThieves(gameView); // update thieves list in each turn, if it's a visible turn it will update them.
-
-        AIProto.Graph graph = gameView.getConfig().getGraph();
+        updateThieves(gameView); // update tracked_thieves list in every visible turn.
 
         int next_node = 1;
 
         if (tracked_thieves != null) { // we have seen thieves at least once.
-            while (selected_thief == null || selected_thief.getIsDead() || selected_thief.getNodeId() == gameView.getViewer().getNodeId()) { // if we are not chasing any thief, we choose another one.
-                int rand = new Random().nextInt(tracked_thieves.size());
-                selected_thief = tracked_thieves.get(rand);
-                // todo: if i go to a thief location and it is not there, i choose another thief to follow, even if the thief is still alive.
-                // todo: selecting a thief is random, which should not be. probably i should choose a thief by is distance from polices.
-            }
 
-            for (AIProto.Agent thief : tracked_thieves) {        // the thief is still alive, and we update its location
-                if (thief.getId() == selected_thief.getId()) {   // and we follow it with its new location.
-                    selected_thief = thief;
+            selected_thief = nearest_thief(gameView, tracked_thieves); // finding the nearest thief.
+
+            ArrayList<Integer> target_neighbors = new ArrayList<>(); // if multiple polices are going to a same thief, i give each of them one of the neighbors as target.
+            for (AIProto.Path path : gameView.getConfig().getGraph().getPathsList()) {
+                if (path.getSecondNodeId() == selected_thief.getNodeId()) {
+                    target_neighbors.add(path.getFirstNodeId());
+                } else if (path.getFirstNodeId() == selected_thief.getNodeId()) {
+                    target_neighbors.add(path.getSecondNodeId());
                 }
             }
-
-            next_node = go(gameView, selected_thief.getNodeId());
+            target_neighbors.sort(Comparator.comparingInt(o -> o));
+            int number_of_polices_with_me_with_lesser_id = 0;
+            for (AIProto.Agent agent : gameView.getVisibleAgentsList()) {
+                if (agent.getNodeId() == gameView.getViewer().getNodeId() && agent.getTeam() == gameView.getViewer().getTeam() && agent.getType() == AIProto.AgentType.POLICE && agent.getId() < gameView.getViewer().getId()) {
+                    number_of_polices_with_me_with_lesser_id++;
+                }
+            }
+            if (number_of_polices_with_me_with_lesser_id == 0)
+                next_node = go(gameView, selected_thief.getNodeId());
+            else
+                next_node = go(gameView, target_neighbors.get(target_neighbors.size() % number_of_polices_with_me_with_lesser_id) - 1); // todo jalbe tavajoh
 
         } else { // we have not seen thieves never yet.
 
@@ -96,7 +102,7 @@ public class PoliceAI extends AI {
         if (gameView.getConfig().getTurnSettings().getVisibleTurnsList().contains(gameView.getTurn().getTurnNumber())) { // if this is the visible turn, i choose new thieves to follow.
             this.tracked_thieves = new ArrayList<>();
             for (AIProto.Agent agent : gameView.getVisibleAgentsList()) {
-                if (agent.getTeam() != gameView.getViewer().getTeam() && agent.getType() == AIProto.AgentType.THIEF) {
+                if (agent.getTeam() != gameView.getViewer().getTeam() && agent.getType() == AIProto.AgentType.THIEF && !agent.getIsDead()) {
                     this.tracked_thieves.add(agent); // now i have an array list of all enemy thieves.
                 }
             }
@@ -131,12 +137,14 @@ public class PoliceAI extends AI {
         System.out.println("first money: " + gameView.getBalance());
         System.out.println("police each turn income: " + gameView.getConfig().getIncomeSettings().getPoliceIncomeEachTurn());
         System.out.println("thief each turn income: " + gameView.getConfig().getIncomeSettings().getThievesIncomeEachTurn());
-        List<AIProto.Path> pathpath = gameView.getConfig().getGraph().getPathsList();
+        List<AIProto.Path> all_paths = gameView.getConfig().getGraph().getPathsList();
         ArrayList<Double> prices = new ArrayList<>();
-        for (AIProto.Path pathPath : pathpath) {
+        for (AIProto.Path pathPath : all_paths) {
             if (!prices.contains(pathPath.getPrice())) {
                 prices.add(pathPath.getPrice());
             }
+            if (prices.size() == 3)
+                break;
         }
         System.out.println("paths price: " + prices);
     }
@@ -172,7 +180,7 @@ public class PoliceAI extends AI {
 
     /////////////////////////////////////////////// FUNCTIONS ///////////////////////////////////////////////
 
-    List<MyPolice> put_first_destinations(GameView gameView, List<MyPolice> my_polices) {
+    List<MyPolice> put_first_destinations(GameView gameView, List<MyPolice> my_polices) { // first placement of polices.
         int visible_ptr = 0;
         int first_visible_turn = gameView.getConfig().getTurnSettings().getVisibleTurnsList().get(visible_ptr);
         while (first_visible_turn % 2 == 1) {
@@ -198,6 +206,29 @@ public class PoliceAI extends AI {
         }
 
         return my_polices;
+    }
+
+    /////////////////////////////////////////////// FUNCTIONS ///////////////////////////////////////////////
+
+    AIProto.Agent nearest_thief(GameView gameView, ArrayList<AIProto.Agent> enemy_thieves) {
+        int min_turns = Integer.MAX_VALUE;
+        AIProto.Agent ans = null;
+
+        for (AIProto.Agent agent : enemy_thieves) {
+            ArrayList<Integer> cheap_path = Dijkstra.findPath(gameView.getConfig().getGraph(), gameView.getViewer().getNodeId(), agent.getNodeId(), Mode.CHEAP);
+            int cheap_turns = HowManyTurns.getAns(gameView.getConfig().getGraph(), gameView.getViewer().getNodeId(), cheap_path, gameView.getBalance(), gameView.getConfig().getIncomeSettings().getPoliceIncomeEachTurn());
+            ArrayList<Integer> short_path = Dijkstra.findPath(gameView.getConfig().getGraph(), gameView.getViewer().getNodeId(), agent.getNodeId(), Mode.SHORT);
+            int short_turns = HowManyTurns.getAns(gameView.getConfig().getGraph(), gameView.getViewer().getNodeId(), short_path, gameView.getBalance(), gameView.getConfig().getIncomeSettings().getPoliceIncomeEachTurn());
+
+            int turns = Math.min(short_turns, cheap_turns);
+
+            if (turns < min_turns) {
+                min_turns = turns;
+                ans = agent;
+            }
+        }
+
+        return ans;
     }
 
     /////////////////////////////////////////////// FUNCTIONS ///////////////////////////////////////////////

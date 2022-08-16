@@ -27,7 +27,7 @@ public class Dijkstra {
         while (!finished_nodes.contains(nodes[dest])) {
             unfinished_nodes.sort((Comparator.comparingDouble(o -> o.value)));
 
-            for (Neighbor neighbor : unfinished_nodes.get(0).neighbors) {
+            for (Neighbor neighbor : unfinished_nodes.get(0).neighbors) { // todo "java.lang.IndexOutOfBoundsException: Index 0 out of bounds for length 0"
                 if (!finished_nodes.contains(neighbor.self)) {
                     if (neighbor.self.value > unfinished_nodes.get(0).value + neighbor.weight) {
                         neighbor.self.value = unfinished_nodes.get(0).value + neighbor.weight;

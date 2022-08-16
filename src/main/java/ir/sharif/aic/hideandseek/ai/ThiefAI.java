@@ -61,6 +61,8 @@ public class ThiefAI extends AI {
         near_nodes.addAll(Functions.find_nodes_with_distance(gameView.getConfig().getGraph(), gameView.getViewer().getNodeId(), 1));
         near_nodes.addAll(Functions.find_nodes_with_distance(gameView.getConfig().getGraph(), gameView.getViewer().getNodeId(), 2));
         near_nodes.addAll(Functions.find_nodes_with_distance(gameView.getConfig().getGraph(), gameView.getViewer().getNodeId(), 3));
+        near_nodes.addAll(Functions.find_nodes_with_distance(gameView.getConfig().getGraph(), gameView.getViewer().getNodeId(), 4));
+//        near_nodes.addAll(Functions.find_nodes_with_distance(gameView.getConfig().getGraph(), gameView.getViewer().getNodeId(), 5));
 
         List<AIProto.Agent> agents = gameView.getVisibleAgentsList();
         ArrayList<AIProto.Agent> enemy_polices = new ArrayList<>();
@@ -86,7 +88,7 @@ public class ThiefAI extends AI {
                     neighbor_nodes.add(path.getFirstNodeId());
                 }
             }
-            near_nodes.add(gameView.getViewer().getNodeId()); // adding this node to the list, cause we can stay  in our place.
+            neighbor_nodes.add(gameView.getViewer().getNodeId()); // adding this node to the list, cause we can stay  in our place.
 
             int final_distance = 0;
             int target_node = gameView.getViewer().getNodeId();
