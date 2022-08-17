@@ -10,6 +10,8 @@ import java.util.*;
 
 public class PoliceAI extends AI {
 
+    // todo : polices stick too much together.
+
     AIProto.Agent selected_thief; // we select a thieve "location" and follow it until we catch it.
     List<Integer> thieves_last_seen; // this is the array list of last places that thieves were seen.
     Stack<Integer> bfs_path; // this is the path we are going to take.
