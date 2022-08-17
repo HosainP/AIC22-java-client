@@ -6,19 +6,16 @@ import ir.sharif.aic.hideandseek.client.Phone;
 import ir.sharif.aic.hideandseek.protobuf.AIProto;
 import ir.sharif.aic.hideandseek.protobuf.AIProto.GameView;
 
-import java.net.Inet4Address;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.List;
-import java.util.Random;
-import java.util.random.RandomGenerator;
 
 public class ThiefAI extends AI {
 
     // todo : //////////////////////////////////////////////////////////////////////////
-    // todo : i should split thieves apart when they stick together.                  //
-    // todo : i should consider if i can or cant pay the price of a path.             //
-    // todo: i should modify starting points for thieves (probably central nodes.)    // DONE!
+    // todo : i should split thieves apart when they stick together.                  // DONE!
+    // todo : i should consider if i can or can't pay the price of a path.             //
+    // todo : if there is no safe neighbor to go to, still move.                      // DONE!
+    // todo : i should modify starting points for thieves (probably central nodes.)   // DONE!
     // todo : //////////////////////////////////////////////////////////////////////////
 
     public ThiefAI(Phone phone) {
@@ -37,13 +34,7 @@ public class ThiefAI extends AI {
             }
         }
         not_in_danger_nodes.sort(Comparator.comparingInt(o -> number_of_neighbors(gameView, o))); // making arrayList of my thieves.
-        ArrayList<AIProto.Agent> all_my_thieves = new ArrayList<>();
-        for (AIProto.Agent agent : gameView.getVisibleAgentsList()) {
-            if (agent.getType() == AIProto.AgentType.THIEF && agent.getTeam() == gameView.getViewer().getTeam()) {
-                all_my_thieves.add(agent);
-            }
-        }
-        all_my_thieves.add(gameView.getViewer()); // adding this thief to list of my thieves.
+        ArrayList<AIProto.Agent> all_my_thieves = get_my_thieves(gameView);
 
         all_my_thieves.sort(Comparator.comparingInt(AIProto.Agent::getId));
         for (int i = 0; i < all_my_thieves.size(); i++) {
@@ -58,28 +49,6 @@ public class ThiefAI extends AI {
      * Implement this function to move your thief agent based on current game view.
      */
 
-//    @Override
-//    public int move(GameView gameView) {
-//
-//        AIProto.Graph graph = gameView.getConfig().getGraph();
-//        List<AIProto.Path> paths = graph.getPathsList();
-//        ArrayList<AIProto.Path> myPaths = new ArrayList<>();
-//
-//        for (AIProto.Path path : paths) {
-//            if (path.getFirstNodeId() == gameView.getViewer().getNodeId()) {
-//                myPaths.add(path);
-//            } else if (path.getSecondNodeId() == gameView.getViewer().getNodeId()) {
-//                myPaths.add(path);
-//            }
-//        }
-//
-//        int rand = new Random().nextInt(myPaths.size());
-//        AIProto.Path path = myPaths.get(rand);
-//        if (gameView.getViewer().getNodeId() == path.getFirstNodeId())
-//            return path.getSecondNodeId();
-//        else
-//            return path.getFirstNodeId();
-//    } // MOVING COMPLETELY RANDOM.
     @Override
     public int move(GameView gameView) {
 
@@ -100,7 +69,6 @@ public class ThiefAI extends AI {
             }
             neighbor_nodes.add(gameView.getViewer().getNodeId()); // adding this node to the list, cause we can stay  in our place.
 
-            int target_node = gameView.getViewer().getNodeId();
             ArrayList<Integer> usable_neighbor_nodes = new ArrayList<>(); // this array list, has all neighbor nodes,
             for (int i : neighbor_nodes) {                                // that we can go to, and has not a police
                 if (usable_node(gameView, i)) {                           // in neighboring.
@@ -110,28 +78,35 @@ public class ThiefAI extends AI {
 
             usable_neighbor_nodes.sort(Comparator.comparingInt(o -> number_of_neighbors(gameView, o))); // sorting usable neighbors by the number of neighbors.
 
-            ArrayList<Integer> most_neighbor_usable_nodes = new ArrayList<>();
-            for (int i : usable_neighbor_nodes) { // keeping only the nodes that have the most neighbors.
-                if (number_of_neighbors(gameView, i) == number_of_neighbors(gameView, usable_neighbor_nodes.get(usable_neighbor_nodes.size() - 1))) {
-                    most_neighbor_usable_nodes.add(i);
+            ArrayList<AIProto.Agent> my_thieves = get_my_thieves(gameView);
+            ArrayList<AIProto.Agent> my_thieves_in_my_node = new ArrayList<>();
+            for (AIProto.Agent agent : my_thieves) {
+                if (agent.getNodeId() == gameView.getViewer().getNodeId()) {
+                    my_thieves_in_my_node.add(agent);
                 }
             }
+            my_thieves_in_my_node.sort(Comparator.comparingInt(AIProto.Agent::getId));
 
-            ArrayList<AIProto.Agent> enemy_polices = new ArrayList<>(); // making list of all enemy polices.
-            for (AIProto.Agent agent : gameView.getVisibleAgentsList()) {
-                if (agent.getTeam() != gameView.getViewer().getTeam() && agent.getType() == AIProto.AgentType.POLICE) {
-                    enemy_polices.add(agent);
+            for (int i = 0; i < my_thieves_in_my_node.size(); i++) {
+                if (my_thieves_in_my_node.get(i).getId() == gameView.getViewer().getId()) {
+                    if (usable_neighbor_nodes.size() - 1 - i >= 0) {
+                        return usable_neighbor_nodes.get((usable_neighbor_nodes.size() - 1 - i));
+                    } else {
+                        if (usable_neighbor_nodes.size() != 0) {
+                            return usable_neighbor_nodes.get(usable_neighbor_nodes.size() - 1); // if there might be an error, i go to neighbor with most neighbors.
+                        } else {
+                            System.out.println("god they can get me.");
+                            ArrayList<Integer> neighbors = neighbors(gameView, gameView.getViewer().getNodeId());
+                            for (int neighbor : neighbors) {
+                                if (!is_filled_with_enemy_police(gameView, neighbor)) {
+                                    return neighbor; // still moving to a neighbor even if i might get caught.
+                                }
+                            }
+                        }
+                    }
                 }
             }
-
-            most_neighbor_usable_nodes.sort(Comparator.comparingInt(o -> distance_to_nearest_police(gameView, enemy_polices, o)));
-            // between all usable nodes with most neighbors, i choose the one that has the most distance from the nearest police.
-            if (usable_neighbor_nodes.size() != 0) {
-                return usable_neighbor_nodes.get(usable_neighbor_nodes.size() - 1);
-            } else {
-                return gameView.getViewer().getNodeId();
-            }
-
+            return gameView.getViewer().getNodeId(); // there is nowhere i can go.
         } else { // not in danger, so we stay in our place.
             return gameView.getViewer().getNodeId();
         }
@@ -202,12 +177,7 @@ public class ThiefAI extends AI {
         near_nodes.addAll(Functions.find_nodes_with_distance(gameView.getConfig().getGraph(), node_id, 4));
 //        near_nodes.addAll(Functions.find_nodes_with_distance(gameView.getConfig().getGraph(), gameView.getViewer().getNodeId(), 5));
 
-        ArrayList<AIProto.Agent> enemy_polices = new ArrayList<>();
-        for (AIProto.Agent agent : gameView.getVisibleAgentsList()) {
-            if (agent.getTeam() != gameView.getViewer().getTeam() && agent.getType() == AIProto.AgentType.POLICE) {
-                enemy_polices.add(agent);
-            }
-        }
+        ArrayList<AIProto.Agent> enemy_polices = get_enemy_polices(gameView);
 
         for (AIProto.Agent enemy : enemy_polices) {
             if (near_nodes.contains(enemy.getNodeId())) {
@@ -220,4 +190,41 @@ public class ThiefAI extends AI {
     }
 
     /////////////////////////////////////////////// FUNCTIONS ///////////////////////////////////////////////
+
+    ArrayList<AIProto.Agent> get_enemy_polices(GameView gameView) { // this function returns an arrayList of enemy polices.
+        ArrayList<AIProto.Agent> enemy_polices = new ArrayList<>();
+        for (AIProto.Agent agent : gameView.getVisibleAgentsList()) {
+            if (agent.getTeam() != gameView.getViewer().getTeam() && agent.getType() == AIProto.AgentType.POLICE) {
+                enemy_polices.add(agent);
+            }
+        }
+        return enemy_polices;
+    }
+
+    /////////////////////////////////////////////// FUNCTIONS ///////////////////////////////////////////////
+
+    ArrayList<AIProto.Agent> get_my_thieves(GameView gameView) { // this function returns an arrayList of my thieves.
+        ArrayList<AIProto.Agent> my_thieves = new ArrayList<>();
+        for (AIProto.Agent agent : gameView.getVisibleAgentsList()) {
+            if (agent.getTeam() == gameView.getViewer().getTeam() && agent.getType() == AIProto.AgentType.THIEF) {
+                my_thieves.add(agent);
+            }
+        }
+        my_thieves.add(gameView.getViewer());
+        return my_thieves;
+    }
+
+    /////////////////////////////////////////////// FUNCTIONS ///////////////////////////////////////////////
+
+    boolean is_filled_with_enemy_police(GameView gameView, int node_id) { // this function returns true if there is an enemy police in node_id.
+        ArrayList<AIProto.Agent> enemy_police = get_enemy_polices(gameView);
+        for (AIProto.Agent agent : enemy_police) {
+            if (agent.getNodeId() == node_id)
+                return true;
+        }
+        return false;
+    }
+
+    /////////////////////////////////////////////// FUNCTIONS ///////////////////////////////////////////////
+
 }

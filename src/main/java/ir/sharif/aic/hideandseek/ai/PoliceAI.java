@@ -80,7 +80,7 @@ public class PoliceAI extends AI {
             if (number_of_polices_with_me_with_lesser_id == 0)
                 next_node = go(gameView, selected_thief.getNodeId());
             else
-                next_node = go(gameView, target_neighbors.get(target_neighbors.size() % number_of_polices_with_me_with_lesser_id) - 1); // todo jalbe tavajoh
+                next_node = go(gameView, target_neighbors.get(target_neighbors.size() % number_of_polices_with_me_with_lesser_id) - 1); // todo "Index 3 out of bounds for length 3"
 
         } else { // we have not seen thieves never yet.
 
