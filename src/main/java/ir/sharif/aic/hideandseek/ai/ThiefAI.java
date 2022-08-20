@@ -11,13 +11,6 @@ import java.util.Comparator;
 
 public class ThiefAI extends AI {
 
-    // todo : //////////////////////////////////////////////////////////////////////////
-    // todo : i should split thieves apart when they stick together.                  // DONE!
-    // todo : i should consider if i can or can't pay the price of a path.             //
-    // todo : if there is no safe neighbor to go to, still move.                      // DONE!
-    // todo : i should modify starting points for thieves (probably central nodes.)   // DONE!
-    // todo : //////////////////////////////////////////////////////////////////////////
-
     public ThiefAI(Phone phone) {
         this.phone = phone;
     }
@@ -54,9 +47,6 @@ public class ThiefAI extends AI {
 
         boolean inDanger = in_danger(gameView, gameView.getViewer().getNodeId());
         // todo: doesn't work properly thieves start moving when polices are only one node far.
-        // todo:
-        // todo:
-        // todo:
 
         if (inDanger) { // we should do something if we are in danger.
             ArrayList<Integer> neighbor_nodes = new ArrayList<>(); // array list for all the nodes we can be in, in the next turn.
@@ -76,6 +66,13 @@ public class ThiefAI extends AI {
                 }
             }
 
+            ArrayList<Integer> temp_neighbors = new ArrayList<>(); // deleting the paths that i can't afford to take.
+            for (int neighbor : usable_neighbor_nodes) {
+                if (can_afford_path(gameView, gameView.getViewer().getNodeId(), neighbor)) {
+                    temp_neighbors.add(neighbor);
+                }
+            }
+            usable_neighbor_nodes = temp_neighbors;
             usable_neighbor_nodes.sort(Comparator.comparingInt(o -> number_of_neighbors(gameView, o))); // sorting usable neighbors by the number of neighbors.
 
             ArrayList<AIProto.Agent> my_thieves = get_my_thieves(gameView);
@@ -87,7 +84,7 @@ public class ThiefAI extends AI {
             }
             my_thieves_in_my_node.sort(Comparator.comparingInt(AIProto.Agent::getId));
 
-            for (int i = 0; i < my_thieves_in_my_node.size(); i++) {
+            for (int i = 0; i < my_thieves_in_my_node.size(); i++) { // if there are more than one thief in this node, they will separate.
                 if (my_thieves_in_my_node.get(i).getId() == gameView.getViewer().getId()) {
                     if (usable_neighbor_nodes.size() - 1 - i >= 0) {
                         return usable_neighbor_nodes.get((usable_neighbor_nodes.size() - 1 - i));
@@ -169,7 +166,6 @@ public class ThiefAI extends AI {
     /////////////////////////////////////////////// FUNCTIONS ///////////////////////////////////////////////
 
     boolean in_danger(GameView gameView, int node_id) {
-        boolean inDanger = false;
         ArrayList<Integer> near_nodes = new ArrayList<>();
         near_nodes.addAll(Functions.find_nodes_with_distance(gameView.getConfig().getGraph(), node_id, 1));
         near_nodes.addAll(Functions.find_nodes_with_distance(gameView.getConfig().getGraph(), node_id, 2));
@@ -181,12 +177,11 @@ public class ThiefAI extends AI {
 
         for (AIProto.Agent enemy : enemy_polices) {
             if (near_nodes.contains(enemy.getNodeId())) {
-                inDanger = true; // there is a police near us. we are in danger.
-                break;
+                return true; // there is a police near us. we are in danger.
             }
         }
 
-        return inDanger;
+        return false;
     }
 
     /////////////////////////////////////////////// FUNCTIONS ///////////////////////////////////////////////
@@ -223,6 +218,19 @@ public class ThiefAI extends AI {
                 return true;
         }
         return false;
+    }
+
+    /////////////////////////////////////////////// FUNCTIONS ///////////////////////////////////////////////
+
+    boolean can_afford_path(GameView gameView, int src, int dest) {
+        double balance = gameView.getBalance();
+        double path_price = 0;
+        for (AIProto.Path path : gameView.getConfig().getGraph().getPathsList()) {
+            if ((path.getFirstNodeId() == src && path.getSecondNodeId() == dest) || (path.getSecondNodeId() == src && path.getFirstNodeId() == dest)) {
+                path_price = path.getPrice();
+            }
+        }
+        return balance >= path_price;
     }
 
     /////////////////////////////////////////////// FUNCTIONS ///////////////////////////////////////////////
